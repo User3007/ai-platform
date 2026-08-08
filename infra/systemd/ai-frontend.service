@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Platform Next.js Frontend
+After=network-online.target ai-backend.service
+Wants=network-online.target
+
+[Service]
+User=thien
+Group=thien
+WorkingDirectory=/home/thien/ai-platform/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=-/home/thien/ai-platform/frontend/.env.local
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3000
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

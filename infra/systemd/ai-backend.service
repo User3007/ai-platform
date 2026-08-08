@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Platform FastAPI Backend
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=thien
+Group=thien
+WorkingDirectory=/home/thien/ai-platform/backend
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/thien/ai-platform/backend/.env
+ExecStart=/home/thien/ai-platform/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

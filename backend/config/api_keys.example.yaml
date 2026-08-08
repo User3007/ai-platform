@@ -1,0 +1,20 @@
+brave_search:
+  api_key: YOUR_BRAVE_SEARCH_API_KEY
+llm_providers:
+  azure_openai_gpt_5_4_mini:
+    base_url: https://your-resource-name.openai.azure.com/
+    api_key: YOUR_AZURE_OPENAI_API_KEY
+    api_version: 2025-03-01-preview
+    deployment: gpt-5.4-mini
+  model_0622e3ad2c9a4dc0bbf0d6729eee5af5:
+    base_url: https://your-resource-name.openai.azure.com/
+    api_key: YOUR_AZURE_OPENAI_API_KEY
+    deployment: gpt-5.4-normal
+    api_version: 2025-03-01-preview
+embeddings:
+  default:
+    provider: azure-openai
+    base_url: https://your-resource-name.openai.azure.com/
+    api_key: YOUR_AZURE_OPENAI_API_KEY
+    api_version: 2024-12-01-preview
+    deployment: text-embedding-3-small
