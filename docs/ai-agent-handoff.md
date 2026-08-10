@@ -18,7 +18,7 @@
 5. Branch only if the task needs more detail
 
 ## Last updated
-- 2026-08-08
+- 2026-08-10
 
 ## Current snapshot
 - Backend entry: `backend/app/main.py`
@@ -40,8 +40,8 @@
 - `user_role` cookie is used by frontend middleware.
 
 ### Chat persistence and streaming behavior
-- Backend emits SSE-like responses.
-- Frontend currently parses the full response after completion.
+- Backend emits normalized incremental SSE events.
+- Frontend renders streamed assistant output progressively.
 - Search and RAG context are injected before provider calls.
 
 ### RAG ingestion and retrieval
@@ -147,6 +147,10 @@
 - This handoff now acts as both the required early-read document and the documentation index.
 - The focused-doc approach is preserved; this file should not absorb all technical detail.
 - When architecture, runtime behavior, workflows, or known issues change, update this file if the read paths, document map, or risk summary change.
+
+## Current caution notes
+- Phase 1 streaming is complete.
+- Frontend rebuilds can still hit recurring `.next` chunk/cache instability; check `docs/status/known-issues.md` before treating missing chunk errors as feature regressions.
 
 ## See also
 - `docs/README.md`

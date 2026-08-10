@@ -1,14 +1,21 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { useChatStore } from '@/store/chatStore'
 
 export function MessageList() {
   const { messages } = useChatStore()
   const hasMessages = messages.length > 0
+  const endRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages])
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#171717] md:p-5">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#171717] md:p-5">
       {!hasMessages ? (
         <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Ready when you are</p>
@@ -27,6 +34,7 @@ export function MessageList() {
             ragResults={message.rag_results}
         />
       ))}
+      <div ref={endRef} />
     </div>
   )
 }

@@ -49,6 +49,8 @@
 
 ## Documentation
 - If architecture, run commands, provider configuration, or major behavior changes, consider updating `docs/ai-agent-handoff.md` and `docs/status/current-state.md`.
+- For roadmap-related work, update `docs/planning/implementation-priority-plan.md` to reflect progress, completed phases or tasks, and any priority changes discovered during execution.
+- When roadmap work resolves or materially changes an active issue, also update `docs/status/known-issues.md` and related planning/status docs so progress stays synchronized.
 
 ## Important Reminders
 - Chat/provider behavior depends on compatible Azure/OpenAI configuration.

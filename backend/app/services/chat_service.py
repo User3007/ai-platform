@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -191,6 +193,47 @@ async def build_chat_response(messages: list[dict[str, str]], model: ModelConfig
         "content": output_text.strip() or "No response received.",
         "tokens_used": total_tokens,
     }
+
+
+async def stream_chat_response(messages: list[dict[str, str]], model: ModelConfig) -> AsyncGenerator[dict, None]:
+    provider_config = _get_provider_config(model.api_key_ref)
+    max_input_tokens = min(settings.max_history_tokens, model.context_length)
+    input_messages = trim_messages_to_token_budget(build_messages_with_search_context(messages), max_input_tokens)
+
+    if model.provider_name == "azure-openai":
+        client = AsyncAzureOpenAI(
+            api_key=provider_config["api_key"],
+            api_version=provider_config["api_version"],
+            azure_endpoint=provider_config["base_url"],
+        )
+        stream = await client.responses.create(
+            model=provider_config.get("deployment", model.model_id),
+            input=input_messages,
+            stream=True,
+        )
+    else:
+        client = AsyncOpenAI(api_key=provider_config["api_key"], base_url=provider_config.get("base_url"))
+        stream = await client.responses.create(model=model.model_id, input=input_messages, stream=True)
+
+    async for event in stream:
+        event_type = getattr(event, "type", "") or ""
+
+        if event_type == "response.output_text.delta":
+            delta = getattr(event, "delta", "") or ""
+            if delta:
+                yield {"type": "message_delta", "delta": delta}
+            continue
+
+        if event_type == "response.completed":
+            response = getattr(event, "response", None)
+            output_text = (getattr(response, "output_text", "") or "").strip() or "No response received."
+            usage = getattr(response, "usage", None)
+            total_tokens = getattr(usage, "total_tokens", None) if usage else None
+            yield {
+                "type": "completion",
+                "content": output_text,
+                "tokens_used": total_tokens,
+            }
 
 
 async def summarize_conversation_title(messages: list[dict[str, str]], model: ModelConfig) -> str:

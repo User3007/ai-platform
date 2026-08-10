@@ -21,25 +21,15 @@
 - `docs/operations/security.md`
 
 ## Last updated
-- 2026-08-08
+- 2026-08-10
 
 ## Last verified
-- 2026-08-08 for issue categorization and current code/doc alignment
+- 2026-08-10 for issue categorization and current code/doc alignment
 - individual runtime workarounds may have older verification dates where noted
 
 ## Active issues
 
-### 1. Chat streaming is not truly incremental
-- Area: backend/frontend integration
-- Severity: medium
-- Status: unresolved
-- Description:
-  - Backend emits SSE-like events over `text/event-stream`, but the current frontend requests the response as text and parses the full payload after completion.
-  - Users do not currently receive true token-by-token live rendering.
-- Workaround:
-  - none beyond accepting current batch-style completion behavior
-
-### 2. Search and citation UX remains basic
+### 1. Search and citation UX remains basic
 - Area: frontend chat UX
 - Severity: low to medium
 - Status: unresolved
@@ -48,7 +38,7 @@
 - Workaround:
   - none required for correctness; this is primarily a UX limitation
 
-### 3. Retry and error UX can be improved
+### 2. Retry and error UX can be improved
 - Area: frontend chat UX
 - Severity: medium
 - Status: unresolved
@@ -57,7 +47,7 @@
 - Workaround:
   - resend the message manually after correcting the underlying issue
 
-### 4. RAG ingestion is synchronous in the request path
+### 3. RAG ingestion is synchronous in the request path
 - Area: backend/RAG
 - Severity: medium
 - Status: unresolved
@@ -66,7 +56,7 @@
 - Workaround:
   - prefer smaller documents during current operation
 
-### 5. Admin UX still needs polish
+### 4. Admin UX still needs polish
 - Area: frontend admin UX
 - Severity: low to medium
 - Status: unresolved
@@ -75,7 +65,7 @@
 - Workaround:
   - rely on surfaced backend validation details where available
 
-### 6. Some responsive and empty-state UX still needs review
+### 5. Some responsive and empty-state UX still needs review
 - Area: frontend layout/UX
 - Severity: low
 - Status: unresolved
@@ -84,7 +74,7 @@
 - Workaround:
   - validate UI changes carefully across screen sizes
 
-### 7. Assistant-side RAG citation UX is limited
+### 6. Assistant-side RAG citation UX is limited
 - Area: frontend chat UX
 - Severity: low
 - Status: unresolved
@@ -93,7 +83,7 @@
 - Workaround:
   - inspect user-side source cards for current RAG evidence
 
-### 8. systemd deployment still needs broader production validation
+### 7. systemd deployment still needs broader production validation
 - Area: infra/operations
 - Severity: medium
 - Status: partially validated
@@ -103,7 +93,7 @@
 - Workaround:
   - use `systemctl status` and `journalctl` checks during deployment validation
 
-### 9. Frontend dev/prod process management is not fully standardized
+### 8. Frontend dev/prod process management is not fully standardized
 - Area: operations
 - Severity: low to medium
 - Status: unresolved
@@ -112,7 +102,7 @@
 - Workaround:
   - use the documented commands in `docs/operations/operations-runbook.md`
 
-### 10. HTTPS and domain hardening are not finalized
+### 9. HTTPS and domain hardening are not finalized
 - Area: infra/security
 - Severity: medium
 - Status: unresolved
@@ -122,7 +112,7 @@
 - Workaround:
   - treat deployment as not fully hardened until explicitly validated
 
-### 11. Restart helper `all` mode is incomplete
+### 10. Restart helper `all` mode is incomplete
 - Area: scripts/operations
 - Severity: low
 - Status: unresolved
@@ -131,16 +121,17 @@
 - Workaround:
   - run backend and frontend restart commands separately
 
-### 12. Transient Next.js `.next` cache inconsistencies can break rebuilds
+### 11. Transient Next.js `.next` cache inconsistencies can break rebuilds
 - Area: frontend build
 - Severity: medium
 - Status: known recurring issue
 - Description:
-  - Missing chunk/module errors can appear after local rebuilds due to stale `.next` state.
+  - Missing chunk/module errors can appear after local rebuilds due to stale or inconsistent `.next` state.
+  - Recent examples included missing `vendor-chunks/axios.js` and missing numbered server chunks such as `./682.js` during page generation.
 - Workaround:
   - clear `frontend/.next` and rebuild
 
-### 13. Structured logging is not implemented
+### 12. Structured logging is not implemented
 - Area: backend/operations
 - Severity: low to medium
 - Status: unresolved
@@ -149,7 +140,7 @@
 - Workaround:
   - use targeted backend/frontend logs and admin usage-log views
 
-### 14. Automated tests are still missing for major flows
+### 13. Automated tests are still missing for major flows
 - Area: quality/testing
 - Severity: medium
 - Status: unresolved

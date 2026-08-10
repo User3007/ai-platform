@@ -20,7 +20,7 @@ export function ChatInput({ conversationId: initialConversationId }: ChatInputPr
   const { createConversation, summarizeConversationTitle } = useConversations()
   const [content, setContent] = useState('')
   const [useWebSearch, setUseWebSearch] = useState(defaultWebSearch)
-  const [useKnowledgeBase, setUseKnowledgeBase] = useState(true)
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(false)
 
   useEffect(() => {
     setUseWebSearch(defaultWebSearch)
@@ -36,13 +36,24 @@ export function ChatInput({ conversationId: initialConversationId }: ChatInputPr
     setContent('')
 
     let conversationId = initialConversationId ?? ''
+    let createdNewConversation = false
     if (!conversationId) {
       const conversation = await createConversation({
         title: trimmedContent.slice(0, 40),
         ...(selectedModelId ? { model_id: selectedModelId } : {}),
       })
       conversationId = conversation.id
-      router.push(`/chat/${conversationId}`)
+      createdNewConversation = true
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pending-new-chat-message', trimmedContent)
+        sessionStorage.setItem('pending-new-chat-use-search', String(useWebSearch))
+        sessionStorage.setItem('pending-new-chat-use-rag', String(useKnowledgeBase))
+      }
+      router.replace(`/chat/${conversationId}`)
+    }
+
+    if (createdNewConversation) {
+      return
     }
 
     const conversation = conversations.find((item) => item.id === conversationId)

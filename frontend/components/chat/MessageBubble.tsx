@@ -97,7 +97,12 @@ export function MessageBubble({ role, content, isError = false, isPending = fals
             {content}
           </ReactMarkdown>
         </div>
-        {isPending ? <div className="mt-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Response in progress</div> : null}
+        {isPending ? (
+          <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-slate-400 dark:bg-slate-500" />
+            Assistant is responding
+          </div>
+        ) : null}
       {role === 'user' && searchResults?.length ? (
         <div className={`mt-4 rounded-2xl border p-4 shadow-sm ${isUser ? 'border-white/15 bg-white/10 dark:border-black/10 dark:bg-black/5' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-[#1c1c1c]'}`}>
           <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">

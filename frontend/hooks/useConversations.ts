@@ -1,7 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import axios from 'axios'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/lib/api'
 import { useChatStore } from '@/store/chatStore'
@@ -14,6 +13,7 @@ type ConversationListResponse = {
 export function useConversations() {
   const { conversations, setConversations } = useChatStore()
   const [loading, setLoading] = useState(false)
+  const hasLoadedRef = useRef(false)
 
   const loadConversations = useCallback(async () => {
     setLoading(true)
@@ -45,7 +45,12 @@ export function useConversations() {
       try {
         await api.delete(`/conversations/${conversationId}`)
       } catch (error) {
-        if (!axios.isAxiosError(error) || error.response?.status !== 404) {
+        const status =
+          typeof error === 'object' && error !== null && 'response' in error
+            ? (error as { response?: { status?: number } }).response?.status
+            : undefined
+
+        if (status !== 404) {
           throw error
         }
       }
@@ -94,6 +99,11 @@ export function useConversations() {
   )
 
   useEffect(() => {
+    if (hasLoadedRef.current) {
+      return
+    }
+
+    hasLoadedRef.current = true
     void loadConversations()
   }, [loadConversations])
 

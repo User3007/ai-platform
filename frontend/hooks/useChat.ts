@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import axios from 'axios'
 
 import { api } from '@/lib/api'
-import { parseSseChunk } from '@/lib/stream'
+import { consumeSseStream, type StreamEvent } from '@/lib/stream'
 import { useChatStore } from '@/store/chatStore'
 import type { Message, RagCitation, SearchResult } from '@/types'
 
@@ -25,6 +24,20 @@ type ConversationDetailResponse = {
 
 type SendMessageOptions = {
   onResponseComplete?: () => Promise<void> | void
+}
+
+function getChatApiUrl(path: string) {
+  const baseUrl = api.defaults.baseURL ?? ''
+
+  if (/^https?:\/\//.test(baseUrl)) {
+    return `${baseUrl}${path}`
+  }
+
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}${baseUrl}${path}`
+  }
+
+  return `${baseUrl}${path}`
 }
 
 export function useChat() {
@@ -68,59 +81,91 @@ export function useChat() {
 
       setLoading(true)
       try {
-        const response = await api.post(
-          `/chat/${conversationId}/send`,
-          { content: trimmedContent, use_search: useSearch, use_rag: useRag },
-          { responseType: 'text' },
-        )
-        const events = typeof response.data === 'string' ? parseSseChunk(response.data) : []
-        const searchResults = (events.find((event) => event.type === 'search_result')?.results as SearchResult[] | undefined) ?? null
-        const ragResults = (events.find((event) => event.type === 'rag_result')?.results as RagCitation[] | undefined) ?? null
-        const assistantContent = events
-          .filter((event) => event.type === 'token')
-          .map((event) => event.content ?? '')
-          .join('')
-        const errorEvent = events.find((event) => event.type === 'error')
+        const authHeader = api.defaults.headers.common.Authorization
+        const response = await fetch(getChatApiUrl(`/chat/${conversationId}/send`), {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(typeof authHeader === 'string' ? { Authorization: authHeader } : {}),
+          },
+          body: JSON.stringify({ content: trimmedContent, use_search: useSearch, use_rag: useRag }),
+        })
 
-        if (searchResults?.length) {
-          updateMessage(optimisticMessage.id, (message) => ({ ...message, search_results: searchResults }))
-          updateMessage(pendingAssistantMessageId, (message) => ({
-            ...message,
-            content: 'Search results found. Finalizing the answer…',
-          }))
-        }
+        let finalEvent: StreamEvent | null = null
+        let errorDetail: string | null = null
 
-        if (ragResults?.length) {
-          updateMessage(optimisticMessage.id, (message) => ({ ...message, rag_results: ragResults }))
-          updateMessage(pendingAssistantMessageId, (message) => ({
-            ...message,
-            content: searchResults?.length ? 'Search and knowledge base results found. Finalizing the answer…' : 'Knowledge base results found. Finalizing the answer…',
-          }))
-        }
+        await consumeSseStream(response, (event) => {
+          if (event.type === 'citations' && event.source === 'search') {
+            const results = (event.results as SearchResult[] | undefined) ?? []
+            updateMessage(optimisticMessage.id, (message) => ({ ...message, search_results: results }))
+            updateMessage(pendingAssistantMessageId, (message) => ({
+              ...message,
+              content: message.content.startsWith('Searching') ? 'Search results found. Drafting the answer…' : message.content,
+            }))
+            return
+          }
 
-        if (errorEvent) {
-          updateMessage(pendingAssistantMessageId, () => ({
-            id: pendingAssistantMessageId,
-            role: 'assistant',
-            content: errorEvent.detail ?? 'Something went wrong while generating a response.',
-            is_error: true,
-            is_pending: false,
-          }))
+          if (event.type === 'citations' && event.source === 'rag') {
+            const results = (event.results as RagCitation[] | undefined) ?? []
+            updateMessage(optimisticMessage.id, (message) => ({ ...message, rag_results: results }))
+            updateMessage(pendingAssistantMessageId, (message) => ({
+              ...message,
+              content: message.content.startsWith('Searching') ? 'Knowledge base results found. Drafting the answer…' : message.content,
+            }))
+            return
+          }
+
+          if (event.type === 'message_delta') {
+            updateMessage(pendingAssistantMessageId, (message) => ({
+              ...message,
+              content:
+                message.is_pending && (message.content.startsWith('Searching') || message.content.startsWith('Thinking'))
+                  ? event.delta ?? ''
+                  : `${message.content}${event.delta ?? ''}`,
+            }))
+            return
+          }
+
+          if (event.type === 'completion') {
+            finalEvent = event
+            updateMessage(pendingAssistantMessageId, (message) => ({
+              ...message,
+              content: event.content || message.content || 'Response received.',
+              tokens_used: event.tokens_used ?? null,
+              is_pending: false,
+            }))
+            return
+          }
+
+          if (event.type === 'error') {
+            const detail = event.detail ?? 'Something went wrong while generating a response.'
+            errorDetail = detail
+            updateMessage(pendingAssistantMessageId, () => ({
+              id: pendingAssistantMessageId,
+              role: 'assistant',
+              content: detail,
+              is_error: true,
+              is_pending: false,
+            }))
+          }
+        })
+
+        if (errorDetail) {
           return useChatStore.getState().messages.find((message) => message.id === pendingAssistantMessageId) ?? null
         }
 
-        updateMessage(pendingAssistantMessageId, (message) => ({
-          ...message,
-          content: assistantContent || 'Response received.',
-          tokens_used: events.find((event) => event.type === 'done')?.tokens_used ?? null,
-          is_pending: false,
-        }))
+        if (!finalEvent) {
+          updateMessage(pendingAssistantMessageId, (message) => ({
+            ...message,
+            is_pending: false,
+          }))
+        }
+
         await options?.onResponseComplete?.()
         return useChatStore.getState().messages.find((message) => message.id === pendingAssistantMessageId) ?? null
       } catch (error) {
-        const detail = axios.isAxiosError(error)
-          ? (error.response?.data?.detail ?? error.message)
-          : 'Something went wrong while sending your message.'
+        const detail = error instanceof Error ? error.message : 'Something went wrong while sending your message.'
 
         updateMessage(pendingAssistantMessageId, () => ({
           id: pendingAssistantMessageId,

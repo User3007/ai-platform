@@ -15,7 +15,7 @@ from app.models.message import Message
 from app.models.model_config import ModelConfig
 from app.models.system_prompt_history import SystemPromptHistory
 from app.schemas.message import SendMessageRequest
-from app.services.chat_service import build_chat_response, get_global_system_prompt, prepend_context_message, prepend_system_prompt
+from app.services.chat_service import get_global_system_prompt, prepend_context_message, prepend_system_prompt, stream_chat_response
 from app.services.rag_service import retrieve_rag_context
 from app.services.search_service import search_web
 
@@ -23,20 +23,70 @@ router = APIRouter()
 
 
 async def event_stream(
+    db: AsyncSession,
+    conversation: Conversation,
     payload: SendMessageRequest,
-    response_text: str,
-    tokens_used: int | None,
+    chat_messages: list[dict[str, str]],
+    model: ModelConfig,
     search_results: list[dict[str, str]] | None = None,
     rag_results: list[dict[str, str | int | float | None]] | None = None,
 ) -> AsyncGenerator[str, None]:
-    yield f"data: {json.dumps({'type': 'search_start'})}\n\n"
+    yield f"data: {json.dumps({'type': 'metadata', 'phase': 'start'})}\n\n"
     if payload.use_rag:
-        yield f"data: {json.dumps({'type': 'rag_result', 'results': rag_results or []})}\n\n"
+        yield f"data: {json.dumps({'type': 'citations', 'source': 'rag', 'results': rag_results or []})}\n\n"
     if payload.use_search:
-        yield f"data: {json.dumps({'type': 'search_result', 'results': search_results or []})}\n\n"
-    for chunk in [response_text[i : i + 120] for i in range(0, len(response_text), 120)] or [response_text]:
-        yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-    yield f"data: {json.dumps({'type': 'done', 'message_id': 'assistant-message', 'tokens_used': tokens_used})}\n\n"
+        yield f"data: {json.dumps({'type': 'citations', 'source': 'search', 'results': search_results or []})}\n\n"
+
+    assistant_chunks: list[str] = []
+    tokens_used: int | None = None
+
+    try:
+        async for event in stream_chat_response(chat_messages, model):
+            if event["type"] == "message_delta":
+                delta = event.get("delta", "")
+                if delta:
+                    assistant_chunks.append(delta)
+                    yield f"data: {json.dumps({'type': 'message_delta', 'delta': delta})}\n\n"
+                continue
+
+            if event["type"] == "completion":
+                final_content = (event.get("content") or "").strip() or ''.join(assistant_chunks).strip() or 'No response received.'
+                tokens_used = event.get("tokens_used")
+                assistant_message = Message(
+                    conversation_id=conversation.id,
+                    role="assistant",
+                    content=final_content,
+                    tokens_used=tokens_used,
+                )
+                db.add(assistant_message)
+                conversation.updated_at = datetime.utcnow()
+                await db.commit()
+                yield f"data: {json.dumps({'type': 'completion', 'message_id': str(assistant_message.id), 'content': final_content, 'tokens_used': tokens_used})}\n\n"
+                return
+
+        final_content = ''.join(assistant_chunks).strip() or 'No response received.'
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=final_content,
+            tokens_used=tokens_used,
+        )
+        db.add(assistant_message)
+        conversation.updated_at = datetime.utcnow()
+        await db.commit()
+        yield f"data: {json.dumps({'type': 'completion', 'message_id': str(assistant_message.id), 'content': final_content, 'tokens_used': tokens_used})}\n\n"
+    except ValueError as exc:
+        await db.rollback()
+        yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
+    except AuthenticationError:
+        await db.rollback()
+        yield f"data: {json.dumps({'type': 'error', 'detail': 'Model provider authentication failed. Check the configured API key and endpoint.'})}\n\n"
+    except OpenAIError as exc:
+        await db.rollback()
+        yield f"data: {json.dumps({'type': 'error', 'detail': f'Model provider request failed: {exc}'})}\n\n"
+    except Exception as exc:
+        await db.rollback()
+        yield f"data: {json.dumps({'type': 'error', 'detail': f'Unexpected streaming error: {exc}'})}\n\n"
 
 
 @router.post("/{conv_id}/send")
@@ -131,35 +181,7 @@ async def send_message(
 
     chat_messages = prepend_system_prompt(chat_messages, system_prompt)
 
-    try:
-        response = await build_chat_response(chat_messages, model)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc),
-        ) from exc
-    except AuthenticationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Model provider authentication failed. Check the configured API key and endpoint.",
-        ) from exc
-    except OpenAIError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Model provider request failed: {exc}",
-        ) from exc
-
-    assistant_message = Message(
-        conversation_id=conversation.id,
-        role="assistant",
-        content=response["content"],
-        tokens_used=response.get("tokens_used"),
-    )
-    db.add(assistant_message)
-    conversation.updated_at = datetime.utcnow()
-    await db.commit()
-
     return StreamingResponse(
-        event_stream(payload, response["content"], response.get("tokens_used"), search_results, rag_results),
+        event_stream(db, conversation, payload, chat_messages, model, search_results, rag_results),
         media_type="text/event-stream",
     )

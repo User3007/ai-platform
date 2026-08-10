@@ -20,7 +20,7 @@
 - `docs/operations/testing.md`
 
 ## Last updated
-- 2026-08-08
+- 2026-08-10
 
 ## Current capabilities
 
@@ -38,9 +38,10 @@
 - continuation of existing conversations
 - full stored history passed to the model
 - admin-managed global system prompt prepended to normal chat requests
-- SSE-like event generation with frontend parsing after response completion
+- true incremental SSE chat streaming with progressive frontend rendering
+- normalized stream events for metadata, citations, message deltas, completion, and errors
 - per-message web search toggle
-- per-message knowledge-base toggle for shared RAG retrieval
+- per-message knowledge-base toggle for shared RAG retrieval, defaulting to off
 - search result persistence on user messages
 - RAG result persistence in frontend state
 
@@ -87,6 +88,8 @@
 ### Conversation loading
 - conversation detail page moved to authenticated client-side loading
 - sending in existing conversations no longer creates unintended new conversations
+- first message in a new conversation is deferred across route transition and auto-sent on the destination conversation page
+- local conversation state is less likely to churn during initial chat route loading
 
 ## Current working status
 - backend runs successfully with `backend/.venv`
@@ -113,6 +116,16 @@
 - documentation set was reorganized for AI readability
 - read order was aligned with repository instructions
 - installed systemd units `ai-backend.service` and `ai-frontend.service` were confirmed enabled
+- backend streaming path was updated to persist assistant messages after streamed completion
+- frontend production build passed after incremental streaming changes
+- backend syntax validation passed after incremental streaming changes
+
+### Verified on 2026-08-10
+- Phase 1 incremental streaming work was completed
+- backend SSE endpoint was directly verified to emit metadata, citations, message deltas, and completion events
+- new-conversation first-send flow was stabilized across `/chat` to `/chat/[id]` navigation
+- knowledge-base toggle default was changed to off
+- frontend still showed recurring `.next` chunk instability during some rebuilds, separate from the completed Phase 1 feature work
 
 ## Interpretation notes
 - This file is a documented snapshot, not a guarantee that every environment is healthy right now.
