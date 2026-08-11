@@ -48,6 +48,7 @@
 - retry action for failed assistant responses without duplicating the original user turn
 - inline non-blocking notices when search or RAG augmentation fails but base chat still succeeds
 - explicit conversation-load error state in the chat view
+- redirect transition state for first-message navigation from `/chat` to `/chat/[id]`
 
 ### Conversations
 - conversation list sidebar
@@ -69,6 +70,7 @@
 - startup helper that runs migrations and model seeding
 - RAG upload directory and embedding config support
 - systemd unit files for backend and frontend
+- frontend dev warmup helper that follows the actual Next.js fallback port during local startup
 
 ## Important completed fixes
 
@@ -135,6 +137,8 @@
 - backend syntax validation passed after Phase 2 retry/error UX changes
 - frontend production build passed after Phase 2 retry/error UX changes
 - backend and frontend now support structured retry/error metadata and non-blocking degraded search/RAG handling in the implemented code paths
+- `/chat` no longer flashes the default empty state during new-conversation redirect; it shows an explicit transition state instead
+- frontend dev warmup was updated to follow the actual local Next.js URL when the default port is unavailable
 
 ## Interpretation notes
 - This file is a documented snapshot, not a guarantee that every environment is healthy right now.

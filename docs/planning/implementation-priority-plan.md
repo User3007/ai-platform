@@ -10,12 +10,14 @@
 
 ## Current execution status
 - Phase 1 completed on 2026-08-10.
-- Phase 2 implementation started on 2026-08-11.
-- Current Phase 2 changes in progress:
+- Phase 2 completed on 2026-08-11.
+- Completed Phase 2 changes:
   - added structured backend chat/search/RAG error metadata for safer frontend handling
   - added frontend retry support that reuses the original user turn instead of duplicating it
   - added inline non-blocking degradation notices when search or RAG augmentation fails but base chat can continue
   - added explicit conversation-load error state and retry affordance for failed assistant responses
+  - added a redirect transition state so `/chat` no longer flashes the empty state while moving to `/chat/[id]`
+  - fixed the frontend dev warmup helper to follow the actual Next.js fallback port during local startup
 - Backend and frontend streaming paths now use a normalized incremental SSE contract.
 - Additional follow-up fixes completed during Phase 1:
   - stabilized first-message send flow for new conversations
@@ -195,8 +197,10 @@ Status: completed on 2026-08-10.
 - Error messages are clearer and more specific.
 - Partial failures do not leave the chat in a broken state.
 
-Status: in progress on 2026-08-11.
+Status: completed on 2026-08-11.
 - implementation landed for structured error metadata, retryable failed assistant responses, auth-aware streaming retry, and non-blocking search/RAG degradation notices
+- new-conversation redirect UX no longer flashes the default empty state during `/chat` to `/chat/[id]` navigation
+- frontend dev warmup now tracks the actual Next.js local URL when the default port is unavailable
 - remaining recommended follow-up: targeted manual smoke coverage for auth-expiry, provider failure, and degraded search/RAG paths
 
 ---

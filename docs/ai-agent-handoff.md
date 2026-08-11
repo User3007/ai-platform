@@ -18,7 +18,7 @@
 5. Branch only if the task needs more detail
 
 ## Last updated
-- 2026-08-10
+- 2026-08-11
 
 ## Current snapshot
 - Backend entry: `backend/app/main.py`
@@ -150,6 +150,7 @@
 
 ## Current caution notes
 - Phase 1 streaming is complete.
+- Phase 2 retry and error UX work is complete, including the first-message redirect transition state.
 - Frontend rebuilds can still hit recurring `.next` chunk/cache instability; check `docs/status/known-issues.md` before treating missing chunk errors as feature regressions.
 
 ## See also

@@ -43,7 +43,7 @@
 - Severity: medium
 - Status: partially resolved
 - Description:
-  - Failed assistant responses now expose a retry action, clearer structured error messaging, and inline degraded search/RAG notices.
+  - Failed assistant responses now expose a retry action, clearer structured error messaging, inline degraded search/RAG notices, and a smoother first-message redirect transition.
   - Remaining gaps are mostly around broader manual validation coverage and any future stop/cancel or richer recovery controls.
 - Workaround:
   - use the inline retry action for failed assistant responses; manual resend is still available if needed
@@ -129,6 +129,7 @@
 - Description:
   - Missing chunk/module errors can appear after local rebuilds due to stale or inconsistent `.next` state.
   - Recent examples included missing `vendor-chunks/axios.js` and missing numbered server chunks such as `./682.js` during page generation.
+  - The local dev warmup helper now follows Next.js fallback ports correctly, but stale `.next` state can still trigger separate cache-related failures.
 - Workaround:
   - clear `frontend/.next` and rebuild
 
