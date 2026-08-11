@@ -9,10 +9,15 @@ import { useChatStore } from '@/store/chatStore'
 
 export default function ChatPage() {
   const clearMessages = useChatStore((state) => state.clearMessages)
+  const pendingChatRedirect = useChatStore((state) => state.pendingChatRedirect)
 
   useEffect(() => {
+    if (pendingChatRedirect) {
+      return
+    }
+
     clearMessages()
-  }, [clearMessages])
+  }, [clearMessages, pendingChatRedirect])
 
   return (
     <main className="flex min-h-[calc(100vh-89px)] flex-col gap-5 rounded-[28px] border border-slate-200 bg-[#fcfcfc] p-5 shadow-sm dark:border-slate-800 dark:bg-[#0b0b0b] md:m-0 md:ml-6 md:p-6">

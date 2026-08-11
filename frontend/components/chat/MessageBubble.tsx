@@ -1,14 +1,18 @@
 import ReactMarkdown from 'react-markdown'
 
-import type { RagCitation, SearchResult } from '@/types'
+import type { ChatWarning, RagCitation, SearchResult } from '@/types'
 
 type Props = {
+  messageId?: string
   role: 'user' | 'assistant'
   content: string
   isError?: boolean
   isPending?: boolean
+  retryable?: boolean
   searchResults?: SearchResult[] | null
   ragResults?: RagCitation[] | null
+  warnings?: ChatWarning[] | null
+  onRetry?: (messageId: string) => void
 }
 
 async function copyText(content: string) {
@@ -42,7 +46,7 @@ function extractCitations(content: string) {
   return Array.from(new Set(matches))
 }
 
-export function MessageBubble({ role, content, isError = false, isPending = false, searchResults, ragResults }: Props) {
+export function MessageBubble({ messageId, role, content, isError = false, isPending = false, retryable = false, searchResults, ragResults, warnings, onRetry }: Props) {
   const handleCopy = async () => {
     try {
       await copyText(content)
@@ -53,8 +57,9 @@ export function MessageBubble({ role, content, isError = false, isPending = fals
 
   const citations = role === 'assistant' ? extractCitations(content) : []
   const isUser = role === 'user'
+  const hasWarnings = Boolean(warnings?.length)
   const markdownClassName = isUser
-    ? 'prose prose-invert max-w-none break-words prose-p:my-3 prose-pre:my-4 prose-pre:overflow-x-auto prose-pre:rounded-2xl prose-pre:bg-black/20 prose-pre:p-4 prose-code:rounded prose-code:bg-black/20 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[0.95em] prose-code:before:content-none prose-code:after:content-none prose-a:text-white prose-a:underline prose-strong:text-white prose-headings:text-white prose-blockquote:border-white/30 prose-blockquote:text-white/80 prose-li:my-1'
+    ? 'prose prose-invert max-w-none break-words prose-p:my-3 prose-pre:my-4 prose-pre:overflow-x-auto prose-pre:rounded-2xl prose-pre:bg-black/20 prose-pre:p-4 prose-code:rounded prose-code:bg-black/20 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[0.95em] prose-code:before:content-none prose-code:after:content-none prose-a:text-white prose-a:underline prose-strong:text-white prose-headings:text-white prose-blockquote:border-white/30 prose-blockquote:text-white/80 prose-li:my-1 dark:prose-p:text-slate-800 dark:prose-li:text-slate-800 dark:prose-strong:text-slate-900 dark:prose-headings:text-slate-900 dark:prose-a:text-slate-900 dark:prose-blockquote:text-slate-700 dark:prose-blockquote:border-slate-300'
     : 'prose max-w-none break-words prose-slate dark:prose-invert prose-p:my-3 prose-pre:my-4 prose-pre:overflow-x-auto prose-pre:rounded-2xl prose-pre:bg-slate-900 prose-pre:p-4 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[0.95em] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-slate-800 prose-a:break-all prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-600 prose-li:my-1'
 
   return (
@@ -88,6 +93,19 @@ export function MessageBubble({ role, content, isError = false, isPending = fals
           </button>
         </div>
 
+        {isError && retryable && messageId && onRetry ? (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-red-300/70 bg-red-100/70 px-3 py-2 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-100">
+            <span>You can retry this response.</span>
+            <button
+              type="button"
+              onClick={() => onRetry(messageId)}
+              className="rounded-full border border-current px-3 py-1 text-xs font-semibold uppercase tracking-wide transition hover:bg-red-200/60 dark:hover:bg-red-900/40"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+
         <div className={markdownClassName}>
           <ReactMarkdown
             components={{
@@ -103,6 +121,18 @@ export function MessageBubble({ role, content, isError = false, isPending = fals
             Assistant is responding
           </div>
         ) : null}
+      {role === 'assistant' && hasWarnings ? (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-100">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">Response notes</div>
+          <div className="space-y-2">
+            {warnings?.map((warning, index) => (
+              <div key={`${warning.code ?? warning.source ?? 'warning'}-${index}`} className="rounded-xl border border-amber-200/80 bg-white/70 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-950/20">
+                <div>{warning.message}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {role === 'user' && searchResults?.length ? (
         <div className={`mt-4 rounded-2xl border p-4 shadow-sm ${isUser ? 'border-white/15 bg-white/10 dark:border-black/10 dark:bg-black/5' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-[#1c1c1c]'}`}>
           <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">

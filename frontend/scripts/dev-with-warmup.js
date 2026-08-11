@@ -3,7 +3,7 @@ const http = require('node:http')
 const https = require('node:https')
 
 const port = process.env.PORT || '3000'
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://127.0.0.1:${port}`
+const configuredBaseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://127.0.0.1:${port}`
 const warmupRoutes = ['/', '/chat', '/settings', '/admin/users', '/admin/models', '/admin/usage-logs']
 const maxAttempts = 60
 const retryDelayMs = 1000
@@ -14,6 +14,30 @@ const nextProcess = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['ne
 })
 
 let shuttingDown = false
+let resolvedBaseUrl = configuredBaseUrl
+
+function normalizeBaseUrl(url) {
+  return url.endsWith('/') ? url.slice(0, -1) : url
+}
+
+function updateResolvedBaseUrlFromOutput(chunk) {
+  const output = chunk.toString()
+  const localUrlMatch = output.match(/- Local:\s+(https?:\/\/[^\s]+)/)
+  if (localUrlMatch?.[1]) {
+    resolvedBaseUrl = normalizeBaseUrl(localUrlMatch[1])
+    return
+  }
+
+  const portFallbackMatch = output.match(/using available port (\d+) instead/i)
+  if (portFallbackMatch?.[1]) {
+    const fallbackUrl = new URL(configuredBaseUrl)
+    fallbackUrl.port = portFallbackMatch[1]
+    resolvedBaseUrl = normalizeBaseUrl(fallbackUrl.toString())
+  }
+}
+
+nextProcess.stdout?.on('data', updateResolvedBaseUrlFromOutput)
+nextProcess.stderr?.on('data', updateResolvedBaseUrlFromOutput)
 
 function requestUrl(url) {
   const client = url.startsWith('https:') ? https : http
@@ -43,7 +67,7 @@ async function waitForServer() {
     }
 
     try {
-      await requestUrl(`${baseUrl}/`)
+      await requestUrl(`${resolvedBaseUrl}/`)
       return true
     } catch {
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
@@ -68,7 +92,7 @@ async function warmRoutes() {
     }
 
     try {
-      const status = await requestUrl(`${baseUrl}${route}`)
+      const status = await requestUrl(`${resolvedBaseUrl}${route}`)
       console.log(`[dev-warmup] ${route} -> ${status}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

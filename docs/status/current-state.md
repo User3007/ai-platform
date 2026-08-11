@@ -20,7 +20,7 @@
 - `docs/operations/testing.md`
 
 ## Last updated
-- 2026-08-10
+- 2026-08-11
 
 ## Current capabilities
 
@@ -40,10 +40,14 @@
 - admin-managed global system prompt prepended to normal chat requests
 - true incremental SSE chat streaming with progressive frontend rendering
 - normalized stream events for metadata, citations, message deltas, completion, and errors
+- structured chat warning/error metadata for retry and degraded augmentation UX
 - per-message web search toggle
 - per-message knowledge-base toggle for shared RAG retrieval, defaulting to off
 - search result persistence on user messages
 - RAG result persistence in frontend state
+- retry action for failed assistant responses without duplicating the original user turn
+- inline non-blocking notices when search or RAG augmentation fails but base chat still succeeds
+- explicit conversation-load error state in the chat view
 
 ### Conversations
 - conversation list sidebar
@@ -126,6 +130,11 @@
 - new-conversation first-send flow was stabilized across `/chat` to `/chat/[id]` navigation
 - knowledge-base toggle default was changed to off
 - frontend still showed recurring `.next` chunk instability during some rebuilds, separate from the completed Phase 1 feature work
+
+### Verified on 2026-08-11
+- backend syntax validation passed after Phase 2 retry/error UX changes
+- frontend production build passed after Phase 2 retry/error UX changes
+- backend and frontend now support structured retry/error metadata and non-blocking degraded search/RAG handling in the implemented code paths
 
 ## Interpretation notes
 - This file is a documented snapshot, not a guarantee that every environment is healthy right now.

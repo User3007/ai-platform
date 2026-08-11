@@ -5,9 +5,55 @@ export type StreamEvent = {
   tokens_used?: number
   message_id?: string
   detail?: string
+  message?: string
+  code?: string
   source?: string
   phase?: string
+  retryable?: boolean
   results?: Record<string, unknown>[]
+}
+
+export type StreamErrorDetail = {
+  message: string
+  code?: string
+  source?: string
+  retryable?: boolean
+}
+
+function normalizeErrorPayload(payload: unknown, fallback: string): StreamErrorDetail {
+  if (payload && typeof payload === 'object') {
+    const detail = payload as {
+      detail?: string | { message?: string; code?: string; source?: string; retryable?: boolean }
+      message?: string
+      code?: string
+      source?: string
+      retryable?: boolean
+    }
+
+    if (typeof detail.detail === 'string') {
+      return { message: detail.detail }
+    }
+
+    if (detail.detail && typeof detail.detail === 'object') {
+      return {
+        message: detail.detail.message ?? fallback,
+        code: detail.detail.code,
+        source: detail.detail.source,
+        retryable: detail.detail.retryable,
+      }
+    }
+
+    if (typeof detail.message === 'string') {
+      return {
+        message: detail.message,
+        code: detail.code,
+        source: detail.source,
+        retryable: detail.retryable,
+      }
+    }
+  }
+
+  return { message: fallback }
 }
 
 export function parseSseChunk(chunk: string): StreamEvent[] {
@@ -31,22 +77,29 @@ export async function consumeSseStream(
   onEvent: (event: StreamEvent) => void,
 ) {
   if (!response.ok) {
-    let detail = 'Something went wrong while sending your message.'
+    let detail: StreamErrorDetail = { message: 'Something went wrong while sending your message.' }
 
     try {
-      const payload = (await response.json()) as { detail?: string }
-      if (payload?.detail) {
-        detail = payload.detail
-      }
+      const payload = (await response.json()) as unknown
+      detail = normalizeErrorPayload(payload, detail.message)
     } catch {
       // Ignore JSON parse failures for non-JSON error bodies.
     }
 
-    throw new Error(detail)
+    const error = new Error(detail.message) as Error & { detail?: StreamErrorDetail }
+    error.detail = detail
+    throw error
   }
 
   if (!response.body) {
-    throw new Error('Streaming response body was not available.')
+    const error = new Error('Streaming response body was not available.') as Error & { detail?: StreamErrorDetail }
+    error.detail = {
+      message: 'Streaming response body was not available.',
+      code: 'stream_body_missing',
+      source: 'chat',
+      retryable: true,
+    }
+    throw error
   }
 
   const reader = response.body.getReader()

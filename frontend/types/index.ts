@@ -28,7 +28,35 @@ export type Message = {
   tokens_used?: number | null
   is_error?: boolean
   is_pending?: boolean
+  error_code?: string | null
+  error_source?: string | null
+  retryable?: boolean
+  retry_of_message_id?: string | null
+  request_context?: MessageRequestContext | null
+  warnings?: ChatWarning[] | null
   created_at?: string
+}
+
+export type MessageRequestContext = {
+  conversation_id: string
+  content: string
+  use_search: boolean
+  use_rag: boolean
+  user_message_id?: string | null
+}
+
+export type ChatWarning = {
+  message: string
+  code?: string
+  source?: string
+  retryable?: boolean
+}
+
+export type PendingChatRedirect = {
+  title: string
+  content: string
+  use_search: boolean
+  use_rag: boolean
 }
 
 export type SearchResult = {

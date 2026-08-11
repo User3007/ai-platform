@@ -21,7 +21,7 @@
 - `docs/operations/security.md`
 
 ## Last updated
-- 2026-08-10
+- 2026-08-11
 
 ## Last verified
 - 2026-08-10 for issue categorization and current code/doc alignment
@@ -41,11 +41,12 @@
 ### 2. Retry and error UX can be improved
 - Area: frontend chat UX
 - Severity: medium
-- Status: unresolved
+- Status: partially resolved
 - Description:
-  - Error states are surfaced, but broader retry affordances and richer feedback are still limited.
+  - Failed assistant responses now expose a retry action, clearer structured error messaging, and inline degraded search/RAG notices.
+  - Remaining gaps are mostly around broader manual validation coverage and any future stop/cancel or richer recovery controls.
 - Workaround:
-  - resend the message manually after correcting the underlying issue
+  - use the inline retry action for failed assistant responses; manual resend is still available if needed
 
 ### 3. RAG ingestion is synchronous in the request path
 - Area: backend/RAG

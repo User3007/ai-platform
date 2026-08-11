@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
-from openai import AsyncAzureOpenAI, AsyncOpenAI
+from openai import APIConnectionError, APITimeoutError, AsyncAzureOpenAI, AsyncOpenAI, AuthenticationError, OpenAIError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.exceptions import UserSafeError
 from app.models.app_setting import AppSetting
 from app.models.model_config import ModelConfig
 
@@ -28,8 +29,58 @@ def _get_provider_config(api_key_ref: str) -> dict:
     providers = settings.api_keys.get("llm_providers", {})
     provider_config = providers.get(api_key_ref)
     if not provider_config:
-        raise ValueError(f"Missing provider config for api_key_ref '{api_key_ref}'")
+        raise UserSafeError(
+            "The selected model is not configured correctly.",
+            code="provider_config_missing",
+            source="provider",
+            retryable=False,
+            status_code=502,
+        )
     return provider_config
+
+
+def normalize_chat_exception(exc: Exception) -> UserSafeError:
+    if isinstance(exc, UserSafeError):
+        return exc
+    if isinstance(exc, AuthenticationError):
+        return UserSafeError(
+            "The model provider rejected the configured credentials.",
+            code="provider_auth_failed",
+            source="provider",
+            retryable=False,
+            status_code=502,
+        )
+    if isinstance(exc, APITimeoutError):
+        return UserSafeError(
+            "The model provider took too long to respond. Please try again.",
+            code="provider_timeout",
+            source="provider",
+            retryable=True,
+            status_code=502,
+        )
+    if isinstance(exc, APIConnectionError):
+        return UserSafeError(
+            "The model provider could not be reached. Please try again.",
+            code="provider_connection_error",
+            source="provider",
+            retryable=True,
+            status_code=502,
+        )
+    if isinstance(exc, OpenAIError):
+        return UserSafeError(
+            "The model provider request failed. Please try again.",
+            code="provider_request_failed",
+            source="provider",
+            retryable=True,
+            status_code=502,
+        )
+    return UserSafeError(
+        "An unexpected error interrupted the response. Please try again.",
+        code="stream_unexpected_error",
+        source="chat",
+        retryable=True,
+        status_code=500,
+    )
 
 
 def _build_input_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -167,23 +218,26 @@ def build_title_summary_messages(messages: list[dict[str, str]]) -> list[dict[st
 
 
 async def build_chat_response(messages: list[dict[str, str]], model: ModelConfig) -> dict:
-    provider_config = _get_provider_config(model.api_key_ref)
-    max_input_tokens = min(settings.max_history_tokens, model.context_length)
-    input_messages = trim_messages_to_token_budget(build_messages_with_search_context(messages), max_input_tokens)
+    try:
+        provider_config = _get_provider_config(model.api_key_ref)
+        max_input_tokens = min(settings.max_history_tokens, model.context_length)
+        input_messages = trim_messages_to_token_budget(build_messages_with_search_context(messages), max_input_tokens)
 
-    if model.provider_name == "azure-openai":
-        client = AsyncAzureOpenAI(
-            api_key=provider_config["api_key"],
-            api_version=provider_config["api_version"],
-            azure_endpoint=provider_config["base_url"],
-        )
-        response = await client.responses.create(
-            model=provider_config.get("deployment", model.model_id),
-            input=input_messages,
-        )
-    else:
-        client = AsyncOpenAI(api_key=provider_config["api_key"], base_url=provider_config.get("base_url"))
-        response = await client.responses.create(model=model.model_id, input=input_messages)
+        if model.provider_name == "azure-openai":
+            client = AsyncAzureOpenAI(
+                api_key=provider_config["api_key"],
+                api_version=provider_config["api_version"],
+                azure_endpoint=provider_config["base_url"],
+            )
+            response = await client.responses.create(
+                model=provider_config.get("deployment", model.model_id),
+                input=input_messages,
+            )
+        else:
+            client = AsyncOpenAI(api_key=provider_config["api_key"], base_url=provider_config.get("base_url"))
+            response = await client.responses.create(model=model.model_id, input=input_messages)
+    except Exception as exc:
+        raise normalize_chat_exception(exc) from exc
 
     output_text = getattr(response, "output_text", "") or ""
     usage = getattr(response, "usage", None)
@@ -196,44 +250,47 @@ async def build_chat_response(messages: list[dict[str, str]], model: ModelConfig
 
 
 async def stream_chat_response(messages: list[dict[str, str]], model: ModelConfig) -> AsyncGenerator[dict, None]:
-    provider_config = _get_provider_config(model.api_key_ref)
-    max_input_tokens = min(settings.max_history_tokens, model.context_length)
-    input_messages = trim_messages_to_token_budget(build_messages_with_search_context(messages), max_input_tokens)
+    try:
+        provider_config = _get_provider_config(model.api_key_ref)
+        max_input_tokens = min(settings.max_history_tokens, model.context_length)
+        input_messages = trim_messages_to_token_budget(build_messages_with_search_context(messages), max_input_tokens)
 
-    if model.provider_name == "azure-openai":
-        client = AsyncAzureOpenAI(
-            api_key=provider_config["api_key"],
-            api_version=provider_config["api_version"],
-            azure_endpoint=provider_config["base_url"],
-        )
-        stream = await client.responses.create(
-            model=provider_config.get("deployment", model.model_id),
-            input=input_messages,
-            stream=True,
-        )
-    else:
-        client = AsyncOpenAI(api_key=provider_config["api_key"], base_url=provider_config.get("base_url"))
-        stream = await client.responses.create(model=model.model_id, input=input_messages, stream=True)
+        if model.provider_name == "azure-openai":
+            client = AsyncAzureOpenAI(
+                api_key=provider_config["api_key"],
+                api_version=provider_config["api_version"],
+                azure_endpoint=provider_config["base_url"],
+            )
+            stream = await client.responses.create(
+                model=provider_config.get("deployment", model.model_id),
+                input=input_messages,
+                stream=True,
+            )
+        else:
+            client = AsyncOpenAI(api_key=provider_config["api_key"], base_url=provider_config.get("base_url"))
+            stream = await client.responses.create(model=model.model_id, input=input_messages, stream=True)
 
-    async for event in stream:
-        event_type = getattr(event, "type", "") or ""
+        async for event in stream:
+            event_type = getattr(event, "type", "") or ""
 
-        if event_type == "response.output_text.delta":
-            delta = getattr(event, "delta", "") or ""
-            if delta:
-                yield {"type": "message_delta", "delta": delta}
-            continue
+            if event_type == "response.output_text.delta":
+                delta = getattr(event, "delta", "") or ""
+                if delta:
+                    yield {"type": "message_delta", "delta": delta}
+                continue
 
-        if event_type == "response.completed":
-            response = getattr(event, "response", None)
-            output_text = (getattr(response, "output_text", "") or "").strip() or "No response received."
-            usage = getattr(response, "usage", None)
-            total_tokens = getattr(usage, "total_tokens", None) if usage else None
-            yield {
-                "type": "completion",
-                "content": output_text,
-                "tokens_used": total_tokens,
-            }
+            if event_type == "response.completed":
+                response = getattr(event, "response", None)
+                output_text = (getattr(response, "output_text", "") or "").strip() or "No response received."
+                usage = getattr(response, "usage", None)
+                total_tokens = getattr(usage, "total_tokens", None) if usage else None
+                yield {
+                    "type": "completion",
+                    "content": output_text,
+                    "tokens_used": total_tokens,
+                }
+    except Exception as exc:
+        raise normalize_chat_exception(exc) from exc
 
 
 async def summarize_conversation_title(messages: list[dict[str, str]], model: ModelConfig) -> str:

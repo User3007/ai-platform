@@ -13,9 +13,11 @@ import { useChatStore } from '@/store/chatStore'
 export default function ConversationPage() {
   const params = useParams<{ id: string }>()
   const conversationId = typeof params?.id === 'string' ? params.id : ''
-  const { loadConversation, sendMessage } = useChat()
+  const { loadConversation, sendMessage, conversationLoading } = useChat()
   const { upsertConversation, summarizeConversationTitle } = useConversations()
   const setMessages = useChatStore((state) => state.setMessages)
+  const setPendingChatRedirect = useChatStore((state) => state.setPendingChatRedirect)
+  const conversationError = useChatStore((state) => state.conversationError)
   const conversations = useChatStore((state) => state.conversations)
   const autoSummarizeTitles = usePreferencesStore((state) => state.autoSummarizeTitles)
   const loadedConversationIdRef = useRef<string | null>(null)
@@ -34,6 +36,7 @@ export default function ConversationPage() {
     if (!conversationId) {
       loadedConversationIdRef.current = null
       autoSendConversationIdRef.current = null
+      setPendingChatRedirect(null)
       setMessages([])
       return
     }
@@ -63,6 +66,7 @@ export default function ConversationPage() {
       }
 
       setMessages(conversation.messages)
+      setPendingChatRedirect(null)
 
       if (conversation.messages.length === 0 && autoSendConversationIdRef.current !== conversation.id) {
         const pendingPrompt = sessionStorage.getItem('pending-new-chat-message')
@@ -85,7 +89,7 @@ export default function ConversationPage() {
         }
       }
     })
-  }, [autoSummarizeTitles, conversationId, loadConversation, sendMessage, setMessages, summarizeConversationTitle, upsertConversation])
+  }, [autoSummarizeTitles, conversationId, loadConversation, sendMessage, setMessages, setPendingChatRedirect, summarizeConversationTitle, upsertConversation])
 
   return (
     <main className="flex min-h-[calc(100vh-89px)] flex-col gap-5 rounded-[28px] border border-slate-200 bg-[#fcfcfc] p-5 shadow-sm dark:border-slate-800 dark:bg-[#0b0b0b] md:m-0 md:ml-6 md:p-6">
@@ -96,6 +100,16 @@ export default function ConversationPage() {
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Continue the chat and keep the context in one place.</p>
         </div>
       </div>
+      {conversationLoading ? (
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-[#171717] dark:text-slate-300">
+          Loading conversation…
+        </div>
+      ) : null}
+      {conversationError ? (
+        <div className="rounded-[24px] border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-100">
+          Unable to load this conversation. Try refreshing or reopening it from the sidebar.
+        </div>
+      ) : null}
       <MessageList />
       <ChatInput conversationId={conversationId} />
     </main>

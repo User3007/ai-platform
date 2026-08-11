@@ -54,3 +54,24 @@ export function setApiAccessToken(token: string | null) {
 
   delete api.defaults.headers.common.Authorization
 }
+
+export async function refreshAccessToken() {
+  if (!refreshRequest) {
+    refreshRequest = api
+      .post('/auth/refresh')
+      .then(({ data }) => {
+        const token = data?.access_token ?? null
+        setApiAccessToken(token)
+        return token
+      })
+      .catch(() => {
+        setApiAccessToken(null)
+        return null
+      })
+      .finally(() => {
+        refreshRequest = null
+      })
+  }
+
+  return refreshRequest
+}

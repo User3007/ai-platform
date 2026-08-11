@@ -14,7 +14,7 @@ type ChatInputProps = {
 
 export function ChatInput({ conversationId: initialConversationId }: ChatInputProps) {
   const router = useRouter()
-  const { selectedModelId, conversations } = useChatStore()
+  const { selectedModelId, conversations, setPendingChatRedirect } = useChatStore()
   const { defaultWebSearch, autoSummarizeTitles } = usePreferencesStore()
   const { sendMessage, loading } = useChat()
   const { createConversation, summarizeConversationTitle } = useConversations()
@@ -49,6 +49,12 @@ export function ChatInput({ conversationId: initialConversationId }: ChatInputPr
         sessionStorage.setItem('pending-new-chat-use-search', String(useWebSearch))
         sessionStorage.setItem('pending-new-chat-use-rag', String(useKnowledgeBase))
       }
+      setPendingChatRedirect({
+        title: trimmedContent.slice(0, 40),
+        content: trimmedContent,
+        use_search: useWebSearch,
+        use_rag: useKnowledgeBase,
+      })
       router.replace(`/chat/${conversationId}`)
     }
 

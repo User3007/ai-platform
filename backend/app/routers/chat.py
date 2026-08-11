@@ -5,17 +5,23 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from openai import AuthenticationError, OpenAIError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import UserSafeError
 from app.dependencies import get_current_user, get_db
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.model_config import ModelConfig
 from app.models.system_prompt_history import SystemPromptHistory
 from app.schemas.message import SendMessageRequest
-from app.services.chat_service import get_global_system_prompt, prepend_context_message, prepend_system_prompt, stream_chat_response
+from app.services.chat_service import (
+    get_global_system_prompt,
+    normalize_chat_exception,
+    prepend_context_message,
+    prepend_system_prompt,
+    stream_chat_response,
+)
 from app.services.rag_service import retrieve_rag_context
 from app.services.search_service import search_web
 
@@ -30,8 +36,11 @@ async def event_stream(
     model: ModelConfig,
     search_results: list[dict[str, str]] | None = None,
     rag_results: list[dict[str, str | int | float | None]] | None = None,
+    warnings: list[dict[str, str | bool]] | None = None,
 ) -> AsyncGenerator[str, None]:
     yield f"data: {json.dumps({'type': 'metadata', 'phase': 'start'})}\n\n"
+    for warning in warnings or []:
+        yield f"data: {json.dumps({'type': 'warning', **warning})}\n\n"
     if payload.use_rag:
         yield f"data: {json.dumps({'type': 'citations', 'source': 'rag', 'results': rag_results or []})}\n\n"
     if payload.use_search:
@@ -77,16 +86,10 @@ async def event_stream(
         yield f"data: {json.dumps({'type': 'completion', 'message_id': str(assistant_message.id), 'content': final_content, 'tokens_used': tokens_used})}\n\n"
     except ValueError as exc:
         await db.rollback()
-        yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
-    except AuthenticationError:
-        await db.rollback()
-        yield f"data: {json.dumps({'type': 'error', 'detail': 'Model provider authentication failed. Check the configured API key and endpoint.'})}\n\n"
-    except OpenAIError as exc:
-        await db.rollback()
-        yield f"data: {json.dumps({'type': 'error', 'detail': f'Model provider request failed: {exc}'})}\n\n"
     except Exception as exc:
         await db.rollback()
-        yield f"data: {json.dumps({'type': 'error', 'detail': f'Unexpected streaming error: {exc}'})}\n\n"
+        normalized_error = normalize_chat_exception(exc)
+        yield f"data: {json.dumps({'type': 'error', 'detail': normalized_error.user_message, 'code': normalized_error.code, 'source': normalized_error.source, 'retryable': normalized_error.retryable})}\n\n"
 
 
 @router.post("/{conv_id}/send")
@@ -118,21 +121,27 @@ async def send_message(
     search_results: list[dict[str, str]] | None = None
     rag_results: list[dict[str, str | int | float | None]] | None = None
     rag_context: str | None = None
+    warnings: list[dict[str, str | bool]] = []
     if payload.use_search:
         try:
             search_results = await search_web(payload.content)
-        except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-        except Exception as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Search provider request failed: {exc}") from exc
+        except UserSafeError as exc:
+            warnings.append(exc.to_response_detail())
 
     if payload.use_rag:
         try:
             rag_results, rag_context = await retrieve_rag_context(db, payload.content)
-        except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        except UserSafeError as exc:
+            warnings.append(exc.to_response_detail())
         except Exception as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"RAG retrieval failed: {exc}") from exc
+            warnings.append(
+                {
+                    'message': 'Knowledge base retrieval is temporarily unavailable. The assistant can continue without it.',
+                    'code': 'rag_unavailable',
+                    'source': 'rag',
+                    'retryable': True,
+                }
+            )
 
     user_message = Message(
         conversation_id=conversation.id,
@@ -182,6 +191,6 @@ async def send_message(
     chat_messages = prepend_system_prompt(chat_messages, system_prompt)
 
     return StreamingResponse(
-        event_stream(db, conversation, payload, chat_messages, model, search_results, rag_results),
+        event_stream(db, conversation, payload, chat_messages, model, search_results, rag_results, warnings),
         media_type="text/event-stream",
     )

@@ -3,10 +3,12 @@
 import { useEffect, useRef } from 'react'
 
 import { MessageBubble } from '@/components/chat/MessageBubble'
+import { useChat } from '@/hooks/useChat'
 import { useChatStore } from '@/store/chatStore'
 
 export function MessageList() {
-  const { messages } = useChatStore()
+  const { messages, conversationError, pendingChatRedirect } = useChatStore()
+  const { retryMessage } = useChat()
   const hasMessages = messages.length > 0
   const endRef = useRef<HTMLDivElement | null>(null)
 
@@ -18,20 +20,39 @@ export function MessageList() {
     <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#171717] md:p-5">
       {!hasMessages ? (
         <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Ready when you are</p>
-          <p className="mt-3 text-lg font-medium text-slate-900 dark:text-white">Start an AI chat.</p>
-          <p className="mt-2 max-w-2xl">Choose a model, ask a question, and optionally bring in web results for extra context.</p>
+          {pendingChatRedirect ? (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Opening conversation</p>
+              <p className="mt-3 text-lg font-medium text-slate-900 dark:text-white">Preparing your new chat…</p>
+              <p className="mt-2 max-w-2xl">Moving your first message into the new conversation and loading the response view.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Ready when you are</p>
+              <p className="mt-3 text-lg font-medium text-slate-900 dark:text-white">Start an AI chat.</p>
+              <p className="mt-2 max-w-2xl">Choose a model, ask a question, and optionally bring in web results for extra context.</p>
+            </>
+          )}
+        </div>
+      ) : null}
+      {conversationError ? (
+        <div className="rounded-[24px] border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-500/40 dark:bg-red-950/30 dark:text-red-100">
+          {conversationError}
         </div>
       ) : null}
       {messages.map((message) => (
         <MessageBubble
           key={message.id}
+          messageId={message.id}
           role={message.role}
           content={message.content}
           isError={message.is_error}
           isPending={message.is_pending}
+          retryable={message.retryable}
           searchResults={message.search_results}
-            ragResults={message.rag_results}
+          ragResults={message.rag_results}
+          warnings={message.warnings}
+          onRetry={retryMessage}
         />
       ))}
       <div ref={endRef} />

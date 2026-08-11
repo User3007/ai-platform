@@ -3,6 +3,7 @@ from __future__ import annotations
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from app.config import settings
+from app.core.exceptions import UserSafeError
 
 DEFAULT_EMBEDDING_DIMENSIONS = 1536
 
@@ -11,7 +12,13 @@ def _get_embedding_config() -> dict:
     embeddings = settings.api_keys.get("embeddings", {})
     default_config = embeddings.get("default")
     if not default_config:
-        raise ValueError("Missing embeddings.default config in backend/config/api_keys.yaml")
+        raise UserSafeError(
+            "Knowledge base retrieval is unavailable because embeddings are not configured.",
+            code="rag_config_missing",
+            source="rag",
+            retryable=False,
+            status_code=502,
+        )
     return default_config
 
 
@@ -23,7 +30,13 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     provider = config.get("provider", "azure-openai")
     model_name = config.get("deployment") or config.get("model")
     if not model_name:
-        raise ValueError("Embedding config must include deployment or model")
+        raise UserSafeError(
+            "Knowledge base retrieval is unavailable because the embedding model is not configured.",
+            code="rag_model_missing",
+            source="rag",
+            retryable=False,
+            status_code=502,
+        )
 
     if provider == "azure-openai":
         client = AsyncAzureOpenAI(
