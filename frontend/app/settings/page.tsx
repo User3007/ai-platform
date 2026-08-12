@@ -8,11 +8,18 @@ import { useTheme } from '@/components/theme/ThemeProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { usePreferencesStore } from '@/store/preferencesStore'
-import type { ModelConfig } from '@/types'
+import type { AiTonePreset, ModelConfig } from '@/types'
 
 type ModelListResponse = {
   items: ModelConfig[]
 }
+
+const AI_TONE_OPTIONS: Array<{ value: AiTonePreset; label: string; description: string }> = [
+  { value: 'default', label: 'Default', description: 'Balanced and neutral responses that follow the base system prompt.' },
+  { value: 'professional', label: 'Professional', description: 'Clear, polished, and businesslike wording.' },
+  { value: 'friendly', label: 'Friendly', description: 'Warm, approachable, and conversational replies.' },
+  { value: 'concise', label: 'Concise', description: 'Shorter answers with minimal extra detail.' },
+]
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
@@ -22,10 +29,14 @@ export default function SettingsPage() {
     defaultWebSearch,
     autoSummarizeTitles,
     chatDensity,
+    aiTonePreset,
+    aiToneCustomInstruction,
     setSelectedModelId,
     setDefaultWebSearch,
     setAutoSummarizeTitles,
     setChatDensity,
+    setAiTonePreset,
+    setAiToneCustomInstruction,
   } = usePreferencesStore()
   const [models, setModels] = useState<ModelConfig[]>([])
 
@@ -184,6 +195,55 @@ export default function SettingsPage() {
                 })}
               </div>
             </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">AI tone</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose how the assistant should sound in your chats.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {AI_TONE_OPTIONS.map((option) => {
+                  const isActive = aiTonePreset === option.value
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setAiTonePreset(option.value)}
+                      className={`rounded-xl border p-4 text-left transition ${
+                        isActive
+                          ? 'border-slate-900 bg-slate-100 ring-2 ring-slate-200 dark:border-slate-500 dark:bg-[#202020] dark:ring-slate-700'
+                          : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-[#111111] dark:hover:border-slate-600 dark:hover:bg-[#1a1a1a]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-base font-medium text-slate-900 dark:text-slate-100">{option.label}</span>
+                        <span
+                          className={`h-3 w-3 rounded-full ${
+                            isActive ? 'bg-slate-900 dark:bg-white' : 'bg-slate-300 dark:bg-slate-600'
+                          }`}
+                        />
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{option.description}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <label className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span className="font-medium text-slate-700 dark:text-slate-200">Custom tone guidance</span>
+              <textarea
+                value={aiToneCustomInstruction}
+                onChange={(event) => setAiToneCustomInstruction(event.target.value)}
+                rows={4}
+                maxLength={1000}
+                className="min-h-[120px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-[#111111] dark:text-slate-100 dark:focus:border-slate-500"
+                placeholder="Optional: e.g. Be calm, practical, and explain tradeoffs clearly."
+              />
+              <span className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>Optional extra guidance layered on top of your selected tone.</span>
+                <span>{aiToneCustomInstruction.length}/1000</span>
+              </span>
+            </label>
           </div>
         </section>
 

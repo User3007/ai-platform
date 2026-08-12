@@ -17,6 +17,12 @@ TITLE_SUMMARY_CHAR_LIMIT = 1200
 SEARCH_RESULT_LIMIT = 5
 SEARCH_SNIPPET_CHAR_LIMIT = 400
 SYSTEM_PROMPT_KEY = "global_system_prompt"
+AI_TONE_PRESET_INSTRUCTIONS = {
+    "default": "",
+    "professional": "Use a professional, polished, and businesslike tone while staying clear and helpful.",
+    "friendly": "Use a friendly, warm, and approachable tone while staying accurate and useful.",
+    "concise": "Use a concise tone. Keep answers brief, direct, and focused on the most important details.",
+}
 DEFAULT_GLOBAL_SYSTEM_PROMPT = (
     "You are AI Platform Assistant, a helpful, accurate, and concise assistant for internal users. "
     "Give direct answers first, then add brief supporting detail when useful. "
@@ -172,6 +178,25 @@ async def get_global_system_prompt(db: AsyncSession) -> str:
     result = await db.execute(select(AppSetting.value).where(AppSetting.key == SYSTEM_PROMPT_KEY))
     value = result.scalar_one_or_none()
     return (value or DEFAULT_GLOBAL_SYSTEM_PROMPT).strip()
+
+
+def build_ai_tone_instruction(ai_tone_preset: str | None, ai_tone_custom_instruction: str | None) -> str:
+    preset_instruction = AI_TONE_PRESET_INSTRUCTIONS.get((ai_tone_preset or "default").strip(), "")
+    custom_instruction = (ai_tone_custom_instruction or "").strip()
+
+    instructions = [instruction for instruction in [preset_instruction, custom_instruction] if instruction]
+    return "\n".join(instructions)
+
+
+def compose_system_prompt(system_prompt: str | None, ai_tone_preset: str | None, ai_tone_custom_instruction: str | None) -> str:
+    normalized_system_prompt = (system_prompt or "").strip()
+    tone_instruction = build_ai_tone_instruction(ai_tone_preset, ai_tone_custom_instruction)
+
+    if normalized_system_prompt and tone_instruction:
+        return f"{normalized_system_prompt}\n\nTone guidance:\n{tone_instruction}"
+    if tone_instruction:
+        return tone_instruction
+    return normalized_system_prompt
 
 
 def _estimate_token_count(text: str) -> int:

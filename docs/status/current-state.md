@@ -38,6 +38,7 @@
 - continuation of existing conversations
 - full stored history passed to the model
 - admin-managed global system prompt prepended to normal chat requests
+- user-specific AI tone preference with preset and custom guidance, combined with the global system prompt at chat runtime
 - true incremental SSE chat streaming with progressive frontend rendering
 - normalized stream events for metadata, citations, message deltas, completion, and errors
 - structured chat warning/error metadata for retry and degraded augmentation UX
@@ -139,6 +140,8 @@
 - backend and frontend now support structured retry/error metadata and non-blocking degraded search/RAG handling in the implemented code paths
 - `/chat` no longer flashes the default empty state during new-conversation redirect; it shows an explicit transition state instead
 - frontend dev warmup was updated to follow the actual local Next.js URL when the default port is unavailable
+- frontend production build passed after adding user AI tone settings and chat payload wiring
+- backend syntax validation passed after adding AI tone prompt composition support
 
 ## Interpretation notes
 - This file is a documented snapshot, not a guarantee that every environment is healthy right now.

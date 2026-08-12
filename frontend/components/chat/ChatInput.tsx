@@ -15,7 +15,7 @@ type ChatInputProps = {
 export function ChatInput({ conversationId: initialConversationId }: ChatInputProps) {
   const router = useRouter()
   const { selectedModelId, conversations, setPendingChatRedirect } = useChatStore()
-  const { defaultWebSearch, autoSummarizeTitles } = usePreferencesStore()
+  const { defaultWebSearch, autoSummarizeTitles, aiTonePreset, aiToneCustomInstruction } = usePreferencesStore()
   const { sendMessage, loading } = useChat()
   const { createConversation, summarizeConversationTitle } = useConversations()
   const [content, setContent] = useState('')
@@ -48,6 +48,8 @@ export function ChatInput({ conversationId: initialConversationId }: ChatInputPr
         sessionStorage.setItem('pending-new-chat-message', trimmedContent)
         sessionStorage.setItem('pending-new-chat-use-search', String(useWebSearch))
         sessionStorage.setItem('pending-new-chat-use-rag', String(useKnowledgeBase))
+        sessionStorage.setItem('pending-new-chat-ai-tone-preset', aiTonePreset)
+        sessionStorage.setItem('pending-new-chat-ai-tone-custom-instruction', aiToneCustomInstruction)
       }
       setPendingChatRedirect({
         title: trimmedContent.slice(0, 40),

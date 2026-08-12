@@ -9,6 +9,7 @@ import { useChat } from '@/hooks/useChat'
 import { useConversations } from '@/hooks/useConversations'
 import { usePreferencesStore } from '@/store/preferencesStore'
 import { useChatStore } from '@/store/chatStore'
+import type { AiTonePreset } from '@/types'
 
 export default function ConversationPage() {
   const params = useParams<{ id: string }>()
@@ -72,12 +73,24 @@ export default function ConversationPage() {
         const pendingPrompt = sessionStorage.getItem('pending-new-chat-message')
         const pendingUseSearch = sessionStorage.getItem('pending-new-chat-use-search')
         const pendingUseRag = sessionStorage.getItem('pending-new-chat-use-rag')
+        const pendingAiTonePreset = sessionStorage.getItem('pending-new-chat-ai-tone-preset')
+        const pendingAiToneCustomInstruction = sessionStorage.getItem('pending-new-chat-ai-tone-custom-instruction')
 
         if (pendingPrompt) {
           autoSendConversationIdRef.current = conversation.id
           sessionStorage.removeItem('pending-new-chat-message')
           sessionStorage.removeItem('pending-new-chat-use-search')
           sessionStorage.removeItem('pending-new-chat-use-rag')
+          sessionStorage.removeItem('pending-new-chat-ai-tone-preset')
+          sessionStorage.removeItem('pending-new-chat-ai-tone-custom-instruction')
+
+          if (pendingAiTonePreset) {
+            usePreferencesStore.setState({ aiTonePreset: pendingAiTonePreset as AiTonePreset })
+          }
+
+          if (pendingAiToneCustomInstruction !== null) {
+            usePreferencesStore.setState({ aiToneCustomInstruction: pendingAiToneCustomInstruction })
+          }
 
           void sendMessage(conversation.id, pendingPrompt, pendingUseSearch === 'true', pendingUseRag === 'true', {
             onResponseComplete: autoSummarizeTitles

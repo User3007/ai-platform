@@ -16,6 +16,7 @@ from app.models.model_config import ModelConfig
 from app.models.system_prompt_history import SystemPromptHistory
 from app.schemas.message import SendMessageRequest
 from app.services.chat_service import (
+    compose_system_prompt,
     get_global_system_prompt,
     normalize_chat_exception,
     prepend_context_message,
@@ -169,7 +170,11 @@ async def send_message(
         if message.role in {"user", "assistant", "system"} and message.content
     ]
     chat_messages = prepend_context_message(chat_messages, rag_context)
-    system_prompt = await get_global_system_prompt(db)
+    system_prompt = compose_system_prompt(
+        await get_global_system_prompt(db),
+        payload.ai_tone_preset,
+        payload.ai_tone_custom_instruction,
+    )
     normalized_system_prompt = system_prompt.strip()
     if normalized_system_prompt:
         prompt_history_result = await db.execute(

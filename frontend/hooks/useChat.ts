@@ -5,7 +5,8 @@ import { useCallback, useState } from 'react'
 import { api, refreshAccessToken } from '@/lib/api'
 import { consumeSseStream, type StreamErrorDetail, type StreamEvent } from '@/lib/stream'
 import { useChatStore } from '@/store/chatStore'
-import type { ChatWarning, Message, MessageRequestContext, RagCitation, SearchResult } from '@/types'
+import { usePreferencesStore } from '@/store/preferencesStore'
+import type { ChatWarning, Message, MessageRequestContext, RagCitation, SearchResult, SendMessagePayload } from '@/types'
 
 function createMessageId() {
   if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
@@ -71,7 +72,7 @@ export function useChat() {
   }, [])
 
   const streamChatRequest = useCallback(
-    async (conversationId: string, payload: { content: string; use_search: boolean; use_rag: boolean }) => {
+    async (conversationId: string, payload: SendMessagePayload) => {
       const authHeader = api.defaults.headers.common.Authorization
 
       const makeRequest = () =>
@@ -167,10 +168,13 @@ export function useChat() {
 
       setLoading(true)
       try {
+        const { aiTonePreset, aiToneCustomInstruction } = usePreferencesStore.getState()
         const response = await streamChatRequest(conversationId, {
           content: trimmedContent,
           use_search: useSearch,
           use_rag: useRag,
+          ai_tone_preset: aiTonePreset,
+          ai_tone_custom_instruction: aiToneCustomInstruction,
         })
 
         let finalEvent: StreamEvent | null = null

@@ -98,6 +98,21 @@ export type ModelConfig = {
   is_active: boolean
 }
 
+export type AiTonePreset = 'default' | 'professional' | 'friendly' | 'concise'
+
+export type AiToneSettings = {
+  preset: AiTonePreset
+  custom_instruction: string
+}
+
+export type SendMessagePayload = {
+  content: string
+  use_search: boolean
+  use_rag: boolean
+  ai_tone_preset?: AiTonePreset
+  ai_tone_custom_instruction?: string
+}
+
 export type AdminModelCreatePayload = {
   display_name: string
   model_id: string
